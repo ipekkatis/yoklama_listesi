@@ -83,8 +83,8 @@
             <div class="card">
                 <h1>🎓 Hafta <span id="sWeek"></span> Yoklama</h1>
                 <div class="warning-box">
-                    ⚠️ <strong>DİKKAT:</strong> Tüm öğrencilerin şu anda aynı şifresi var (19070001053). 
-                    Lütfen öğretmeninizden doğru öğrenci numaralarını alın!
+                    ⚠️ <strong>DİKKAT:</strong> Çoğu öğrencinin aynı şifresi var (19070001053). 
+                    Lütfen öğretmeninizden doğru öğrenci numaranızı alın!
                 </div>
                 <input type="text" id="sName" class="input-field" placeholder="Ad Soyad (büyük/küçük harf farketmez)">
                 <input type="password" id="sNumber" class="input-field" placeholder="Okul Numarası (Şifre)">
@@ -100,16 +100,12 @@
         const TEACHER = {user: 'Orkun Karabaşoğlu', pass: 'orkun.karabasoglu'};
         const MAX_WEEKS = 14, PASS_PERCENT = 70;
         
-        // Doğru kampüs koordinatları (N 38° 29' 6", E 27° 15' 8")
         const CAMPUS_COORDS = {lat: 38.485, lon: 27.2522};
-        
         const MAX_DISTANCE = 500;
         const MAX_ACCURACY = 100;
         const MIN_SAMPLES = 3;
         const COLLECTION_TIMEOUT = 20000;
         
-        // ⚠️ DİKKAT: Şu anda hemen hemen tüm öğrencilerin aynı numarası var!
-        // Gerçek öğrenci numaralarıyla güncellenmelidir.
         const STUDENTS = {
             'İbrahim Gültekin': '18070003013',
             'Elif Emine Günal': '19070001053',
@@ -155,17 +151,26 @@
             'Ahmet Özgür Korkmaz': '21070001046'
         };
 
-        // Büyük/küçük harf duyarsız arama için normalize edilmiş öğrenci listesi
         const STUDENTS_NORMALIZED = {};
         Object.entries(STUDENTS).forEach(([name, id]) => {
-            const normalized = name.toLowerCase()
-                .replace(/ı/g, 'i')
-                .replace(/İ/g, 'i')
-                .trim();
+            const normalized = normalizeturkish(name);
             STUDENTS_NORMALIZED[normalized] = {original: name, id: id};
         });
         
         let data = {};
+
+        function normalizeturkish(str) {
+            return str
+                .replace(/İ/g, 'i')
+                .replace(/I/g, 'ı')
+                .replace(/Ğ/g, 'ğ')
+                .replace(/Ü/g, 'ü')
+                .replace(/Ş/g, 'ş')
+                .replace(/Ö/g, 'ö')
+                .replace(/Ç/g, 'ç')
+                .toLowerCase()
+                .trim();
+        }
 
         function loadData() {
             try {
@@ -185,20 +190,6 @@
             }
         }
 
-        function normalizeturkish(str) {
-            // Turkish-aware case conversion
-            return str
-                .replace(/İ/g, 'i')
-                .replace(/I/g, 'ı')
-                .replace(/Ğ/g, 'ğ')
-                .replace(/Ü/g, 'ü')
-                .replace(/Ş/g, 'ş')
-                .replace(/Ö/g, 'ö')
-                .replace(/Ç/g, 'ç')
-                .toLowerCase()
-                .trim();
-        }
-
         function hide(ids) { ids.forEach(id => document.getElementById(id).classList.add('hidden')); }
         function show(id) { hide(['teacherLogin','teacherPanel','reportScreen','studentLogin']); document.getElementById(id).classList.remove('hidden'); }
 
@@ -215,7 +206,7 @@
         function verifyLocationPro() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
-                    reject('❌ Tarayıcınız GPS desteklemiyor!\n\nLütfen güncel bir tarayıcı kullanın (Chrome, Firefox, Safari).');
+                    reject('❌ Tarayıcınız GPS desteklemiyor!');
                     return;
                 }
 
@@ -237,54 +228,45 @@
                         const lastSample = samples[samples.length - 1];
                         debugInfo = `
                             <div class="debug-info">
-                                <strong>🔍 Debug Bilgisi:</strong><br>
-                                Son Konum: ${lastSample.lat.toFixed(6)}, ${lastSample.lon.toFixed(6)}<br>
-                                Kampüs: ${CAMPUS_COORDS.lat.toFixed(6)}, ${CAMPUS_COORDS.lon.toFixed(6)}<br>
-                                Uzaklık: ${getDistance(lastSample.lat, lastSample.lon, CAMPUS_COORDS.lat, CAMPUS_COORDS.lon).toFixed(0)}m<br>
-                                Limit: ${MAX_DISTANCE}m
+                                <strong>🔍 Debug:</strong><br>
+                                Konum: ${lastSample.lat.toFixed(6)}, ${lastSample.lon.toFixed(6)}<br>
+                                Kampüs: ${CAMPUS_COORDS.lat}, ${CAMPUS_COORDS.lon}<br>
+                                Uzaklık: ${getDistance(lastSample.lat, lastSample.lon, CAMPUS_COORDS.lat, CAMPUS_COORDS.lon).toFixed(0)}m
                             </div>
                         `;
                     }
                     
                     progressEl.innerHTML = `
                         <div class="gps-progress">
-                            <h3 style="color: #667eea; margin-bottom: 15px;">📡 GPS Kalitesi: ${quality}</h3>
+                            <h3 style="color: #667eea;">📡 GPS: ${quality}</h3>
                             <div class="progress-bar">
                                 <div class="progress-fill" style="width: ${progress}%">${progress.toFixed(0)}%</div>
                             </div>
-                            <div class="gps-detail">✓ Kaliteli Ölçüm: ${samples.length} / ${MIN_SAMPLES}</div>
-                            <div class="gps-detail">⏱ Geçen Süre: ${elapsed}s / ${COLLECTION_TIMEOUT/1000}s</div>
+                            <div class="gps-detail">✓ Ölçüm: ${samples.length}/${MIN_SAMPLES}</div>
+                            <div class="gps-detail">⏱ Süre: ${elapsed}s</div>
                             ${samples.length > 0 ? `<div class="gps-detail">📍 Doğruluk: ±${samples[samples.length-1].accuracy.toFixed(0)}m</div>` : ''}
-                            ${samples.length === 0 && elapsed > 5 ? '<div class="gps-detail" style="color: #dc3545;">⚠️ GPS sinyali alınamıyor. Pencere kenarına gidin veya dışarı çıkın.</div>' : ''}
                             ${debugInfo}
                         </div>
                     `;
                 }
 
                 function finishCollection() {
-                    if (watchId !== null) {
-                        navigator.geolocation.clearWatch(watchId);
-                        watchId = null;
-                    }
-                    if (timeoutId) {
-                        clearTimeout(timeoutId);
-                        timeoutId = null;
-                    }
+                    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+                    if (timeoutId) clearTimeout(timeoutId);
                     progressEl.classList.add('hidden');
 
                     if (samples.length < MIN_SAMPLES) {
-                        reject(`❌ Yetersiz GPS kalitesi!\n\n${samples.length}/${MIN_SAMPLES} kaliteli ölçüm alındı.\n\n💡 İpuçları:\n• Pencere kenarına gidin\n• Binanın dışına çıkın\n• GPS'iniz açık olduğundan emin olun\n• Birkaç dakika bekleyin ve tekrar deneyin`);
+                        reject(`❌ Yetersiz GPS! ${samples.length}/${MIN_SAMPLES} ölçüm.\n\nPencere kenarına gidin.`);
                         return;
                     }
 
-                    const avgLat = samples.reduce((sum, s) => sum + s.lat, 0) / samples.length;
-                    const avgLon = samples.reduce((sum, s) => sum + s.lon, 0) / samples.length;
-                    const avgAcc = samples.reduce((sum, s) => sum + s.accuracy, 0) / samples.length;
-                    
+                    const avgLat = samples.reduce((s, x) => s + x.lat, 0) / samples.length;
+                    const avgLon = samples.reduce((s, x) => s + x.lon, 0) / samples.length;
+                    const avgAcc = samples.reduce((s, x) => s + x.accuracy, 0) / samples.length;
                     const distance = getDistance(avgLat, avgLon, CAMPUS_COORDS.lat, CAMPUS_COORDS.lon);
 
                     if (distance > MAX_DISTANCE) {
-                        reject(`❌ Kampüs dışındasınız!\n\n📍 Uzaklık: ${distance.toFixed(0)}m (Limit: ${MAX_DISTANCE}m)\n📊 Doğruluk: ±${avgAcc.toFixed(0)}m\n🔢 Ölçüm: ${samples.length} adet\n\n🗺 Sizin Konumunuz:\n${avgLat.toFixed(6)}, ${avgLon.toFixed(6)}\n\n🏫 Kampüs Konumu:\n${CAMPUS_COORDS.lat.toFixed(6)}, ${CAMPUS_COORDS.lon.toFixed(6)}`);
+                        reject(`❌ Kampüs dışı!\n\nUzaklık: ${distance.toFixed(0)}m\nLimit: ${MAX_DISTANCE}m`);
                     } else {
                         resolve({
                             distance: distance.toFixed(0),
@@ -297,58 +279,29 @@
                 }
 
                 watchId = navigator.geolocation.watchPosition(
-                    position => {
-                        const accuracy = position.coords.accuracy;
-                        
-                        console.log(`GPS Verisi: Lat=${position.coords.latitude.toFixed(6)}, Lon=${position.coords.longitude.toFixed(6)}, Acc=±${accuracy.toFixed(0)}m`);
-                        
-                        if (accuracy <= MAX_ACCURACY) {
+                    pos => {
+                        if (pos.coords.accuracy <= MAX_ACCURACY) {
                             samples.push({
-                                lat: position.coords.latitude,
-                                lon: position.coords.longitude,
-                                accuracy: accuracy,
+                                lat: pos.coords.latitude,
+                                lon: pos.coords.longitude,
+                                accuracy: pos.coords.accuracy,
                                 timestamp: Date.now()
                             });
-                            
                             updateProgress();
-
-                            if (samples.length >= MIN_SAMPLES) {
-                                finishCollection();
-                            }
-                        } else {
-                            console.log(`❌ Düşük kalite GPS reddedildi: ±${accuracy.toFixed(0)}m (Limit: ${MAX_ACCURACY}m)`);
-                            updateProgress();
+                            if (samples.length >= MIN_SAMPLES) finishCollection();
                         }
                     },
-                    error => {
-                        if (watchId !== null) {
-                            navigator.geolocation.clearWatch(watchId);
-                            watchId = null;
-                        }
+                    err => {
+                        if (watchId) navigator.geolocation.clearWatch(watchId);
                         if (timeoutId) clearTimeout(timeoutId);
                         progressEl.classList.add('hidden');
-                        
-                        let msg = '❌ GPS Hatası:\n\n';
-                        if (error.code === 1) {
-                            msg += '🚫 Konum izni reddedildi!\n\nLütfen:\n1. Tarayıcı adres çubuğundaki kilit simgesine tıklayın\n2. "Konum" iznini "İzin Ver" olarak değiştirin\n3. Sayfayı yenileyin';
-                        } else if (error.code === 2) {
-                            msg += '📡 Konum alınamıyor!\n\nLütfen:\n1. Cihazınızın GPS\'ini açın\n2. Pencere kenarına veya dışarı çıkın\n3. Birkaç dakika bekleyin';
-                        } else if (error.code === 3) {
-                            msg += '⏱ Zaman aşımı!\n\nGPS sinyali çok zayıf.\nDışarı çıkıp tekrar deneyin.';
-                        } else {
-                            msg += error.message || 'Bilinmeyen hata';
-                        }
-                        reject(msg);
+                        reject('❌ GPS Hatası: ' + (err.code === 1 ? 'İzin reddedildi' : err.code === 2 ? 'Konum alınamıyor' : 'Zaman aşımı'));
                     },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );
 
                 updateProgress();
-                timeoutId = setTimeout(() => { finishCollection(); }, COLLECTION_TIMEOUT);
+                timeoutId = setTimeout(finishCollection, COLLECTION_TIMEOUT);
             });
         }
 
@@ -356,14 +309,15 @@
             const u = document.getElementById('tUsername').value.trim();
             const p = document.getElementById('tPassword').value.trim();
             
-            // Büyük/küçük harf duyarsız kontrol
             if (normalizeturkish(u) === normalizeturkish(TEACHER.user) && 
                 normalizeturkish(p) === normalizeturkish(TEACHER.pass)) {
                 show('teacherPanel');
                 const sel = document.getElementById('weekSelect');
                 sel.innerHTML = '<option value="">Hafta Seçin...</option>';
                 for (let i = 1; i <= MAX_WEEKS; i++) sel.innerHTML += `<option value="${i}">Hafta ${i}</option>`;
-            } else alert('❌ Hatalı giriş!');
+            } else {
+                alert('❌ Hatalı giriş!');
+            }
         }
 
         function showQR() {
@@ -382,15 +336,12 @@
             show('reportScreen');
             const stats = {};
             Object.values(STUDENTS_NORMALIZED).forEach(s => {
-                const num = s.id;
-                stats[num] = {name: s.original, weeks: []};
+                stats[s.id] = {name: s.original, weeks: []};
             });
             
             for (let i = 1; i <= MAX_WEEKS; i++) {
-                (data[`week${i}`] || []).forEach(record => {
-                    if (stats[record.number]) {
-                        stats[record.number].weeks.push(i);
-                    }
+                (data[`week${i}`] || []).forEach(r => {
+                    if (stats[r.number]) stats[r.number].weeks.push(i);
                 });
             }
             
@@ -402,20 +353,20 @@
             
             document.getElementById('reportStats').innerHTML = `
                 <div class="stats">
-                    <div class="stat-box"><div class="stat-num">${Object.keys(stats).length}</div><div class="stat-label">Toplam Öğrenci</div></div>
+                    <div class="stat-box"><div class="stat-num">${Object.keys(stats).length}</div><div class="stat-label">Toplam</div></div>
                     <div class="stat-box"><div class="stat-num">${pass}</div><div class="stat-label">Geçen</div></div>
                     <div class="stat-box"><div class="stat-num">${fail}</div><div class="stat-label">Kalan</div></div>
-                    <div class="stat-box"><div class="stat-num">${(total / (Object.keys(stats).length * MAX_WEEKS) * 100).toFixed(1)}%</div><div class="stat-label">Ortalama Katılım</div></div>
+                    <div class="stat-box"><div class="stat-num">${(total / (Object.keys(stats).length * MAX_WEEKS) * 100).toFixed(1)}%</div><div class="stat-label">Ortalama</div></div>
                 </div>`;
             
-            let html = '<table><thead><tr><th>No</th><th>Ad Soyad</th><th>Katılım</th><th>Oran</th><th>Haftalar</th><th>Durum</th></tr></thead><tbody>';
+            let html = '<table><thead><tr><th>No</th><th>Ad</th><th>Katılım</th><th>%</th><th>Haftalar</th><th>Durum</th></tr></thead><tbody>';
             Object.entries(stats).sort((a,b) => a[0].localeCompare(b[0])).forEach(([num, s]) => {
                 const att = s.weeks.length;
                 const per = (att / MAX_WEEKS * 100).toFixed(1);
                 const weeks = Array.from({length: MAX_WEEKS}, (_, i) => i + 1).map(i => 
                     `<span class="week-badge week-${s.weeks.includes(i) ? 'present' : 'absent'}">${i}</span>`
                 ).join('');
-                html += `<tr><td>${num}</td><td>${s.name}</td><td>${att}/${MAX_WEEKS}</td><td>${per}%</td><td>${weeks}</td><td>${per >= PASS_PERCENT ? '<span class="badge-pass">✓ Geçti</span>' : '<span class="badge-fail">✗ Kaldı</span>'}</td></tr>`;
+                html += `<tr><td>${num}</td><td>${s.name}</td><td>${att}/${MAX_WEEKS}</td><td>${per}%</td><td>${weeks}</td><td>${per >= PASS_PERCENT ? '<span class="badge-pass">✓</span>' : '<span class="badge-fail">✗</span>'}</td></tr>`;
             });
             document.getElementById('reportTable').innerHTML = html + '</tbody></table>';
         }
@@ -428,7 +379,7 @@
             const week = new URLSearchParams(location.search).get('week');
             const btn = document.getElementById('submitBtn');
             btn.disabled = true;
-            btn.textContent = '⏳ Kontrol ediliyor...';
+            btn.textContent = '⏳ Kontrol...';
             
             if (!nameInput || !num) {
                 showResult('⚠️ Tüm alanları doldurun!', 'warning');
@@ -438,42 +389,102 @@
             }
             
             try {
-                // Büyük/küçük harf duyarsız kontrol
-                const normalizedInput = normalizeturkish(nameInput);
-                const student = STUDENTS_NORMALIZED[normalizedInput];
+                const normalized = normalizeturkish(nameInput);
+                const student = STUDENTS_NORMALIZED[normalized];
                 
                 if (!student || student.id !== num) {
-                    throw new Error('❌ Hatalı bilgi!\n\nAd Soyad ve şifre (okul numarası) eşleşmiyor.');
+                    throw new Error('❌ Hatalı bilgi!');
                 }
                 
-                const actualName = student.original;
-                
-                // GPS kontrolü
-                showResult('📡 GPS sinyali aranıyor...\n\nBu işlem 5-20 saniye sürebilir.\nLütfen bekleyin ve sayfayı kapatmayın.', 'info');
+                showResult('📡 GPS aranıyor...', 'info');
                 const gpsData = await verifyLocationPro();
                 
-                // Kayıt kontrolü
                 const key = `week${week}`;
                 if (!data[key]) data[key] = [];
                 if (data[key].some(s => s.number === num)) {
-                    throw new Error('⚠️ Bu hafta zaten yoklamanız alınmış!');
+                    throw new Error('⚠️ Bu hafta zaten kaydınız var!');
                 }
                 
-                // Kaydet
                 data[key].push({
-                    name: actualName, 
+                    name: student.original, 
                     number: num, 
                     timestamp: Date.now(),
                     gps: gpsData
                 });
                 saveData();
                 
-                showResult(`✅ BAŞARILI!\n\n👤 ${actualName}\n📅 Hafta ${week} kaydedildi!\n\n📍 Uzaklık: ${gpsData.distance}m\n📊 Doğruluk: ±${gpsData.accuracy}m\n🔢 Ölçüm Sayısı: ${gpsData.samples}\n🗺 Konum: ${gpsData.lat}, ${gpsData.lon}`, 'success');
-                btn.textContent = '✓ KAYIT ALINDI';
+                showResult(`✅ BAŞARILI!\n\n${student.original}\nHafta ${week}\n\n📍 ${gpsData.distance}m\n📊 ±${gpsData.accuracy}m`, 'success');
+                btn.textContent = '✓ ALINDI';
                 showStats(num);
             } catch (e) {
-                const errorMsg = e.message || e.toString();
-                showResult(errorMsg, 'danger');
+                showResult(e.message || e, 'danger');
                 btn.disabled = false;
                 btn.textContent = 'Yoklama Al';
-                console.error('Hata:',
+            }
+        }
+
+        function showStats(num) {
+            let weeks = [];
+            for (let i = 1; i <= MAX_WEEKS; i++) {
+                if (data[`week${i}`]?.some(s => s.number === num)) weeks.push(i);
+            }
+            const att = weeks.length;
+            const per = (att / MAX_WEEKS * 100).toFixed(1);
+            const rem = Math.max(0, Math.ceil(MAX_WEEKS * (100 - PASS_PERCENT) / 100) - (MAX_WEEKS - att));
+            const weekBadges = Array.from({length: MAX_WEEKS}, (_, i) => i + 1).map(i => 
+                `<span class="week-badge week-${weeks.includes(i) ? 'present' : 'absent'}">${i}</span>`
+            ).join('');
+            
+            let status = per >= PASS_PERCENT ? `<div class="alert alert-success">✅ GEÇTİ (${per}%)</div>` :
+                         rem > 0 ? `<div class="alert alert-warning">⚠️ ${rem} hak kaldı</div>` :
+                         '<div class="alert alert-danger">❌ KALDI</div>';
+            
+            document.getElementById('studentStats').innerHTML = `
+                <div class="stats" style="margin-top: 30px;">
+                    <div class="stat-box"><div class="stat-num">${att}</div><div class="stat-label">Katıldım</div></div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"><div class="stat-num">${MAX_WEEKS - att}</div><div class="stat-label">Devamsız</div></div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"><div class="stat-num">${per}%</div><div class="stat-label">Oran</div></div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"><div class="stat-num">${rem}</div><div class="stat-label">Kalan</div></div>
+                </div>
+                <div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                    <h3 style="margin-bottom: 10px; color: #667eea;">Haftalar:</h3>
+                    ${weekBadges}
+                </div>
+                ${status}`;
+            document.getElementById('studentStats').classList.remove('hidden');
+        }
+
+        function showResult(msg, type) {
+            document.getElementById('result').innerHTML = `<div class="alert alert-${type}">${msg.replace(/\n/g, '<br>')}</div>`;
+        }
+
+        function exportCSV() {
+            let csv = 'No,Ad,Katılım,Oran,Durum,Haftalar\n';
+            const stats = {};
+            Object.values(STUDENTS_NORMALIZED).forEach(s => {
+                stats[s.id] = {name: s.original, weeks: []};
+            });
+            for (let i = 1; i <= MAX_WEEKS; i++) {
+                (data[`week${i}`] || []).forEach(r => {
+                    if (stats[r.number]) stats[r.number].weeks.push(i);
+                });
+            }
+            Object.entries(stats).forEach(([num, s]) => {
+                const per = (s.weeks.length / MAX_WEEKS * 100).toFixed(1);
+                csv += `"${num}","${s.name}","${s.weeks.length}/${MAX_WEEKS}","${per}%","${per >= PASS_PERCENT ? 'Geçti' : 'Kaldı'}","${s.weeks.join('-')}"\n`;
+            });
+            const blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8;'});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `devam_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        window.onload = () => {
+            loadData();
+            const params = new URLSearchParams(location.search);
+            if (params.has('week')) {
+                show('studentLogin');
+                document.getElementById('sWeek').textContent = params.get('week');
+            } else {
+                show('teacherLogin');
