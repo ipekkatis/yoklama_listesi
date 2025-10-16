@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENGR 4451 - GPS Yoklama</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card { background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin-bottom: 20px; }
+        h1 { color: #667eea; text-align: center; margin-bottom: 30px; font-size: 36px; }
+        .input-field { width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; margin-bottom: 20px; }
+        .input-field:focus { outline: none; border-color: #667eea; }
+        .btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; transition: all 0.3s; }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .hidden { display: none; }
+        .qr-box { background: white; padding: 30px; border-radius: 15px; text-align: center; display: inline-block; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background: #667eea; color: white; padding: 15px; text-align: left; }
+        td { padding: 15px; border-bottom: 1px solid #ddd; }
+        .badge-pass { background: #28a745; color: white; padding: 5px 15px; border-radius: 20px; }
+        .badge-fail { background: #dc3545; color: white; padding: 5px 15px; border-radius: 20px; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin: 30px 0; }
+        .stat-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 15px; text-align: center; }
+        .stat-num { font-size: 48px; font-weight: bold; }
+        .stat-label { font-size: 14px; opacity: 0.9; margin-top: 10px; }
+        .week-badge { display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+        .week-present { background: #28a745; color: white; }
+        .week-absent { background: #dc3545; color: white; }
+        .alert { padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center; font-weight: bold; }
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-danger { background: #f8d7da; color: #721c24; }
+        .alert-warning { background: #fff3cd; color: #856404; }
+        .alert-info { background: #d1ecf1; color: #0c5460; }
+        .gps-progress { background: #f8f9fa; border-radius: 10px; padding: 20px; margin: 20px 0; }
+        .progress-bar { background: #e9ecef; height: 30px; border-radius: 15px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); height: 100%; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .gps-detail { font-size: 14px; color: #666; margin: 5px 0; }
+        .debug-info { background: #f8f9fa; padding: 15px; border-radius: 10px; margin: 20px 0; font-size: 12px; font-family: monospace; }
+        .warning-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="teacherLogin" class="card">
+            <h1>👨‍🏫 Öğretmen Girişi</h1>
+            <input type="text" id="tUsername" class="input-field" placeholder="Kullanıcı Adı: Orkun Karabaşoğlu (büyük/küçük harf farketmez)">
+            <input type="password" id="tPassword" class="input-field" placeholder="Şifre: orkun.karabasoglu (büyük/küçük harf farketmez)">
+            <button class="btn" onclick="teacherLogin()">Giriş Yap</button>
+        </div>
+
+        <div id="teacherPanel" class="hidden">
+            <div class="card">
+                <h1>📊 Yoklama Paneli</h1>
+                <select id="weekSelect" class="input-field">
+                    <option value="">Hafta Seçin...</option>
+                </select>
+                <button class="btn" onclick="showQR()">QR Oluştur</button>
+                <button class="btn" onclick="showReport()" style="margin-top: 10px; background: #28a745;">Rapor Görüntüle</button>
+                <div id="qrArea" class="hidden" style="text-align: center; margin-top: 30px;">
+                    <div class="qr-box">
+                        <h2 style="color: #667eea; margin-bottom: 20px;">Hafta <span id="qrWeek"></span></h2>
+                        <div id="qrcode"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="reportScreen" class="hidden">
+            <div class="card">
+                <h1>📈 Devam Raporu</h1>
+                <button class="btn" onclick="backToPanel()">← Geri</button>
+                <div id="reportStats"></div>
+                <div id="reportTable"></div>
+                <button class="btn" onclick="exportCSV()" style="margin-top: 20px; background: #28a745;">CSV İndir</button>
+            </div>
+        </div>
+
+        <div id="studentLogin" class="hidden">
+            <div class="card">
+                <h1>🎓 Hafta <span id="sWeek"></span> Yoklama</h1>
+                <div class="warning-box">
+                    ⚠️ <strong>DİKKAT:</strong> Çoğu öğrencinin aynı şifresi var (19070001053). 
+                    Lütfen öğretmeninizden doğru öğrenci numaranızı alın!
+                </div>
+                <input type="text" id="sName" class="input-field" placeholder="Ad Soyad (büyük/küçük harf farketmez)">
+                <input type="password" id="sNumber" class="input-field" placeholder="Okul Numarası (Şifre)">
+                <button id="submitBtn" class="btn" onclick="submitAttendance()">Yoklama Al</button>
+                <div id="gpsProgress" class="hidden"></div>
+                <div id="result"></div>
+                <div id="studentStats" class="hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const TEACHER = {user: 'Orkun Karabaşoğlu', pass: 'orkun.karabasoglu'};
+        const MAX_WEEKS = 14, PASS_PERCENT = 70;
+        
+        const CAMPUS_COORDS = {lat: 38.485, lon: 27.2522};
+        const MAX_DISTANCE = 500;
+        const MAX_ACCURACY = 100;
+        const MIN_SAMPLES = 3;
+        const COLLECTION_TIMEOUT = 20000;
+        
+        const STUDENTS = {
+            'İbrahim Gültekin': '18070003013',
+            'Elif Emine Günal': '19070001053',
+            'Erk Yankı Ural': '19070008012',
+            'Erce Özkan': '20070001057',
+            'İpek Atış': '20070002048',
+            'İdil Ece Cevahir': '20070007004',
+            'Sude Onfidan': '20070008016',
+            'Ömer Arıca': '20070008017',
+            'Selim Mert Kırcaalili': '20070008019',
+            'Beril Deran Gürbüz': '20070008029',
+            'Ali Haktan Sığın': '21070001004',
+            'Arda Altunhan': '21070001051',
+            'Ekrem Temel': '21070001070',
+            'Nesrin Şentürk': '21070002005',
+            'Batuhan Şişman': '21070002025',
+            'Kıvanç Efe Ergönül': '21070005027',
+            'Oğuz Koyucan': '21070005030',
+            'Zeynep Arslanbuğa': '21070005042',
+            'Beste Tekin': '21070007001',
+            'Ekin Altunkaya': '21070007004',
+            'Emre Erişir': '21070008009',
+            'İsmail Canberk Demirkan': '21070008014',
+            'Can Girgin': '21070008016',
+            'Kerem Eroğlu': '21070008017',
+            'Armağan Soylu': '21070008027',
+            'Alp Serkan Merkit': '21070008033',
+            'Atakan Dinçer': '21070008034',
+            'Demet Büyüktaş': '21070008206',
+            'Gürkan Eroğlu': '22070001041',
+            'Emre Efe Yüksel': '22070001055',
+            'Süleyman Batu Sarı': '22070002015',
+            'Kadir Emre Güneş': '22070002047',
+            'Toprak Tuncer': '22070005040',
+            'Emre Can Hekimoğlu': '22070005053',
+            'Ilgar Şenol': '22070007014',
+            'Eda Nur Çalışkan': '22070008017',
+            'Sami Berk Şahin': '22070008021',
+            'Deniz Ünver': '22070008026',
+            'Aykan Kanlı': '22070008034',
+            'Deniz Karatepe': '22070008043',
+            'Ayşegül Karınyarıcı': '22070003022',
+            'Ahmet Özgür Korkmaz': '21070001046'
+        };
+
+        const STUDENTS_NORMALIZED = {};
+        Object.entries(STUDENTS).forEach(([name, id]) => {
+            const normalized = normalizeturkish(name);
+            STUDENTS_NORMALIZED[normalized] = {original: name, id: id};
+        });
+        
+        let data = {};
+
+        function normalizeturkish(str) {
+            return str
+                .replace(/İ/g, 'i')
+                .replace(/I/g, 'ı')
+                .replace(/Ğ/g, 'ğ')
+                .replace(/Ü/g, 'ü')
+                .replace(/Ş/g, 'ş')
+                .replace(/Ö/g, 'ö')
+                .replace(/Ç/g, 'ç')
+                .toLowerCase()
+                .trim();
+        }
+
+        function loadData() {
+            try {
+                const stored = localStorage.getItem('attendance');
+                data = stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                console.error('Veri yükleme hatası:', e);
+                data = {};
+            }
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem('attendance', JSON.stringify(data));
+            } catch (e) {
+                console.error('Veri kaydetme hatası:', e);
+            }
+        }
+
+        function hide(ids) { ids.forEach(id => document.getElementById(id).classList.add('hidden')); }
+        function show(id) { hide(['teacherLogin','teacherPanel','reportScreen','studentLogin']); document.getElementById(id).classList.remove('hidden'); }
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function verifyLocationPro() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject('❌ Tarayıcınız GPS desteklemiyor!');
+                    return;
+                }
+
+                const progressEl = document.getElementById('gpsProgress');
+                progressEl.classList.remove('hidden');
+                
+                let samples = [];
+                let watchId = null;
+                let startTime = Date.now();
+                let timeoutId = null;
+
+                function updateProgress() {
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                    const quality = samples.length >= MIN_SAMPLES ? '🟢 Mükemmel' : samples.length > 0 ? '🟡 İyi' : '🔴 Zayıf';
+                    const progress = Math.min((samples.length / MIN_SAMPLES) * 100, 100);
+                    
+                    let debugInfo = '';
+                    if (samples.length > 0) {
+                        const lastSample = samples[samples.length - 1];
+                        debugInfo = `
+                            <div class="debug-info">
+                                <strong>🔍 Debug:</strong><br>
+                                Konum: ${lastSample.lat.toFixed(6)}, ${lastSample.lon.toFixed(6)}<br>
+                                Kampüs: ${CAMPUS_COORDS.lat}, ${CAMPUS_COORDS.lon}<br>
+                                Uzaklık: ${getDistance(lastSample.lat, lastSample.lon, CAMPUS_COORDS.lat, CAMPUS_COORDS.lon).toFixed(0)}m
+                            </div>
+                        `;
+                    }
+                    
+                    progressEl.innerHTML = `
+                        <div class="gps-progress">
+                            <h3 style="color: #667eea;">📡 GPS: ${quality}</h3>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${progress}%">${progress.toFixed(0)}%</div>
+                            </div>
+                            <div class="gps-detail">✓ Ölçüm: ${samples.length}/${MIN_SAMPLES}</div>
+                            <div class="gps-detail">⏱ Süre: ${elapsed}s</div>
+                            ${samples.length > 0 ? `<div class="gps-detail">📍 Doğruluk: ±${samples[samples.length-1].accuracy.toFixed(0)}m</div>` : ''}
+                            ${debugInfo}
+                        </div>
+                    `;
+                }
+
+                function finishCollection() {
+                    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+                    if (timeoutId) clearTimeout(timeoutId);
+                    progressEl.classList.add('hidden');
+
+                    if (samples.length < MIN_SAMPLES) {
+                        reject(`❌ Yetersiz GPS! ${samples.length}/${MIN_SAMPLES} ölçüm.\n\nPencere kenarına gidin.`);
+                        return;
+                    }
+
+                    const avgLat = samples.reduce((s, x) => s + x.lat, 0) / samples.length;
+                    const avgLon = samples.reduce((s, x) => s + x.lon, 0) / samples.length;
+                    const avgAcc = samples.reduce((s, x) => s + x.accuracy, 0) / samples.length;
+                    const distance = getDistance(avgLat, avgLon, CAMPUS_COORDS.lat, CAMPUS_COORDS.lon);
+
+                    if (distance > MAX_DISTANCE) {
+                        reject(`❌ Kampüs dışı!\n\nUzaklık: ${distance.toFixed(0)}m\nLimit: ${MAX_DISTANCE}m`);
+                    } else {
+                        resolve({
+                            distance: distance.toFixed(0),
+                            accuracy: avgAcc.toFixed(0),
+                            samples: samples.length,
+                            lat: avgLat.toFixed(6),
+                            lon: avgLon.toFixed(6)
+                        });
+                    }
+                }
+
+                watchId = navigator.geolocation.watchPosition(
+                    pos => {
+                        if (pos.coords.accuracy <= MAX_ACCURACY) {
+                            samples.push({
+                                lat: pos.coords.latitude,
+                                lon: pos.coords.longitude,
+                                accuracy: pos.coords.accuracy,
+                                timestamp: Date.now()
+                            });
+                            updateProgress();
+                            if (samples.length >= MIN_SAMPLES) finishCollection();
+                        }
+                    },
+                    err => {
+                        if (watchId) navigator.geolocation.clearWatch(watchId);
+                        if (timeoutId) clearTimeout(timeoutId);
+                        progressEl.classList.add('hidden');
+                        reject('❌ GPS Hatası: ' + (err.code === 1 ? 'İzin reddedildi' : err.code === 2 ? 'Konum alınamıyor' : 'Zaman aşımı'));
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+
+                updateProgress();
+                timeoutId = setTimeout(finishCollection, COLLECTION_TIMEOUT);
+            });
+        }
+
+        function teacherLogin() {
+            const u = document.getElementById('tUsername').value.trim();
+            const p = document.getElementById('tPassword').value.trim();
+            
+            if (normalizeturkish(u) === normalizeturkish(TEACHER.user) && 
+                normalizeturkish(p) === normalizeturkish(TEACHER.pass)) {
+                show('teacherPanel');
+                const sel = document.getElementById('weekSelect');
+                sel.innerHTML = '<option value="">Hafta Seçin...</option>';
+                for (let i = 1; i <= MAX_WEEKS; i++) sel.innerHTML += `<option value="${i}">Hafta ${i}</option>`;
+            } else {
+                alert('❌ Hatalı giriş!');
+            }
+        }
+
+        function showQR() {
+            const w = document.getElementById('weekSelect').value;
+            if (!w) return alert('Hafta seçin!');
+            document.getElementById('qrWeek').textContent = w;
+            document.getElementById('qrcode').innerHTML = '';
+            new QRCode(document.getElementById('qrcode'), {
+                text: `${location.href.split('?')[0]}?week=${w}`,
+                width: 300, height: 300
+            });
+            document.getElementById('qrArea').classList.remove('hidden');
+        }
+
+        function showReport() {
+            show('reportScreen');
+            const stats = {};
+            Object.values(STUDENTS_NORMALIZED).forEach(s => {
+                stats[s.id] = {name: s.original, weeks: []};
+            });
+            
+            for (let i = 1; i <= MAX_WEEKS; i++) {
+                (data[`week${i}`] || []).forEach(r => {
+                    if (stats[r.number]) stats[r.number].weeks.push(i);
+                });
+            }
+            
+            let total = 0, pass = 0, fail = 0;
+            Object.values(stats).forEach(s => {
+                total += s.weeks.length;
+                ((s.weeks.length / MAX_WEEKS * 100) >= PASS_PERCENT) ? pass++ : fail++;
+            });
+            
+            document.getElementById('reportStats').innerHTML = `
+                <div class="stats">
+                    <div class="stat-box"><div class="stat-num">${Object.keys(stats).length}</div><div class="stat-label">Toplam</div></div>
+                    <div class="stat-box"><div class="stat-num">${pass}</div><div class="stat-label">Geçen</div></div>
+                    <div class="stat-box"><div class="stat-num">${fail}</div><div class="stat-label">Kalan</div></div>
+                    <div class="stat-box"><div class="stat-num">${(total / (Object.keys(stats).length * MAX_WEEKS) * 100).toFixed(1)}%</div><div class="stat-label">Ortalama</div></div>
+                </div>`;
+            
+            let html = '<table><thead><tr><th>No</th><th>Ad</th><th>Katılım</th><th>%</th><th>Haftalar</th><th>Durum</th></tr></thead><tbody>';
+            Object.entries(stats).sort((a,b) => a[0].localeCompare(b[0])).forEach(([num, s]) => {
+                const att = s.weeks.length;
+                const per = (att / MAX_WEEKS * 100).toFixed(1);
+                const weeks = Array.from({length: MAX_WEEKS}, (_, i) => i + 1).map(i => 
+                    `<span class="week-badge week-${s.weeks.includes(i) ? 'present' : 'absent'}">${i}</span>`
+                ).join('');
+                html += `<tr><td>${num}</td><td>${s.name}</td><td>${att}/${MAX_WEEKS}</td><td>${per}%</td><td>${weeks}</td><td>${per >= PASS_PERCENT ? '<span class="badge-pass">✓</span>' : '<span class="badge-fail">✗</span>'}</td></tr>`;
+            });
+            document.getElementById('reportTable').innerHTML = html + '</tbody></table>';
+        }
+
+        function backToPanel() { show('teacherPanel'); }
+
+        async function submitAttendance() {
+            const nameInput = document.getElementById('sName').value.trim();
+            const num = document.getElementById('sNumber').value.trim();
+            const week = new URLSearchParams(location.search).get('week');
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Kontrol...';
+            
+            if (!nameInput || !num) {
+                showResult('⚠️ Tüm alanları doldurun!', 'warning');
+                btn.disabled = false;
+                btn.textContent = 'Yoklama Al';
+                return;
+            }
+            
+            try {
+                const normalized = normalizeturkish(nameInput);
+                const student = STUDENTS_NORMALIZED[normalized];
+                
+                if (!student || student.id !== num) {
+                    throw new Error('❌ Hatalı bilgi!');
+                }
+                
+                showResult('📡 GPS aranıyor...', 'info');
+                const gpsData = await verifyLocationPro();
+                
+                const key = `week${week}`;
+                if (!data[key]) data[key] = [];
+                if (data[key].some(s => s.number === num)) {
+                    throw new Error('⚠️ Bu hafta zaten kaydınız var!');
+                }
+                
+                data[key].push({
+                    name: student.original, 
+                    number: num, 
+                    timestamp: Date.now(),
+                    gps: gpsData
+                });
+                saveData();
+                
+                showResult(`✅ BAŞARILI!\n\n${student.original}\nHafta ${week}\n\n📍 ${gpsData.distance}m\n📊 ±${gpsData.accuracy}m`, 'success');
+                btn.textContent = '✓ ALINDI';
+                showStats(num);
+            } catch (e) {
+                showResult(e.message || e, 'danger');
+                btn.disabled = false;
+                btn.textContent = 'Yoklama Al';
+            }
+        }
+
+        function showStats(num) {
+            let weeks = [];
+            for (let i = 1; i <= MAX_WEEKS; i++) {
+                if (data[`week${i}`]?.some(s => s.number === num)) weeks.push(i);
+            }
+            const att = weeks.length;
+            const per = (att / MAX_WEEKS * 100).toFixed(1);
+            const rem = Math.max(0, Math.ceil(MAX_WEEKS * (100 - PASS_PERCENT) / 100) - (MAX_WEEKS - att));
+            const weekBadges = Array.from({length: MAX_WEEKS}, (_, i) => i + 1).map(i => 
+                `<span class="week-badge week-${weeks.includes(i) ? 'present' : 'absent'}">${i}</span>`
+            ).join('');
+            
+            let status = per >= PASS_PERCENT ? `<div class="alert alert-success">✅ GEÇTİ (${per}%)</div>` :
+                         rem > 0 ? `<div class="alert alert-warning">⚠️ ${rem} hak kaldı</div>` :
+                         '<div class="alert alert-danger">❌ KALDI</div>';
+            
+            document.getElementById('studentStats').innerHTML = `
+                <div class="stats" style="margin-top: 30px;">
+                    <div class="stat-box"><div class="stat-num">${att}</div><div class="stat-label">Katıldım</div></div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"><div class="stat-num">${MAX_WEEKS - att}</div><div class="stat-label">Devamsız</div></div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"><div class="stat-num">${per}%</div><div class="stat-label">Oran</div></div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"><div class="stat-num">${rem}</div><div class="stat-label">Kalan</div></div>
+                </div>
+                <div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                    <h3 style="margin-bottom: 10px; color: #667eea;">Haftalar:</h3>
+                    ${weekBadges}
+                </div>
+                ${status}`;
+            document.getElementById('studentStats').classList.remove('hidden');
+        }
+
+        function showResult(msg, type) {
+            document.getElementById('result').innerHTML = `<div class="alert alert-${type}">${msg.replace(/\n/g, '<br>')}</div>`;
+        }
+
+        function exportCSV() {
+            let csv = 'No,Ad,Katılım,Oran,Durum,Haftalar\n';
+            const stats = {};
+            Object.values(STUDENTS_NORMALIZED).forEach(s => {
+                stats[s.id] = {name: s.original, weeks: []};
+            });
+            for (let i = 1; i <= MAX_WEEKS; i++) {
+                (data[`week${i}`] || []).forEach(r => {
+                    if (stats[r.number]) stats[r.number].weeks.push(i);
+                });
+            }
+            Object.entries(stats).forEach(([num, s]) => {
+                const per = (s.weeks.length / MAX_WEEKS * 100).toFixed(1);
+                csv += `"${num}","${s.name}","${s.weeks.length}/${MAX_WEEKS}","${per}%","${per >= PASS_PERCENT ? 'Geçti' : 'Kaldı'}","${s.weeks.join('-')}"\n`;
+            });
+            const blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8;'});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `devam_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        window.onload = () => {
+            loadData();
+            const params = new URLSearchParams(location.search);
+            if (params.has('week')) {
+                show('studentLogin');
+                document.getElementById('sWeek').textContent = params.get('week');
+            } else {
+                show('teacherLogin');
+            }
+        };
+    </script>
+</body>
+</html>
+            
