@@ -97,15 +97,30 @@
     </div>
 
     <script>
+        // ✅ DÜZELTME: Önce fonksiyonu tanımla
+        function normalizeturkish(str) {
+            return str
+                .replace(/İ/g, 'i')
+                .replace(/I/g, 'ı')
+                .replace(/Ğ/g, 'ğ')
+                .replace(/Ü/g, 'ü')
+                .replace(/Ş/g, 'ş')
+                .replace(/Ö/g, 'ö')
+                .replace(/Ç/g, 'ç')
+                .toLowerCase()
+                .trim();
+        }
+
+        // Config
         const TEACHER = {user: 'Orkun Karabaşoğlu', pass: 'orkun.karabasoglu'};
         const MAX_WEEKS = 14, PASS_PERCENT = 70;
-        
         const CAMPUS_COORDS = {lat: 38.485, lon: 27.2522};
         const MAX_DISTANCE = 500;
         const MAX_ACCURACY = 100;
         const MIN_SAMPLES = 3;
         const COLLECTION_TIMEOUT = 20000;
         
+        // Student list
         const STUDENTS = {
             'İbrahim Gültekin': '18070003013',
             'Elif Emine Günal': '19070001053',
@@ -151,6 +166,7 @@
             'Ahmet Özgür Korkmaz': '21070001046'
         };
 
+        // ✅ Şimdi güvenle normalizeturkish kullanabiliriz
         const STUDENTS_NORMALIZED = {};
         Object.entries(STUDENTS).forEach(([name, id]) => {
             const normalized = normalizeturkish(name);
@@ -158,19 +174,6 @@
         });
         
         let data = {};
-
-        function normalizeturkish(str) {
-            return str
-                .replace(/İ/g, 'i')
-                .replace(/I/g, 'ı')
-                .replace(/Ğ/g, 'ğ')
-                .replace(/Ü/g, 'ü')
-                .replace(/Ş/g, 'ş')
-                .replace(/Ö/g, 'ö')
-                .replace(/Ç/g, 'ç')
-                .toLowerCase()
-                .trim();
-        }
 
         function loadData() {
             try {
@@ -190,8 +193,18 @@
             }
         }
 
-        function hide(ids) { ids.forEach(id => document.getElementById(id).classList.add('hidden')); }
-        function show(id) { hide(['teacherLogin','teacherPanel','reportScreen','studentLogin']); document.getElementById(id).classList.remove('hidden'); }
+        function hide(ids) { 
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+        }
+        
+        function show(id) { 
+            hide(['teacherLogin','teacherPanel','reportScreen','studentLogin']); 
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('hidden');
+        }
 
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
@@ -211,6 +224,10 @@
                 }
 
                 const progressEl = document.getElementById('gpsProgress');
+                if (!progressEl) {
+                    reject('❌ Progress element bulunamadı!');
+                    return;
+                }
                 progressEl.classList.remove('hidden');
                 
                 let samples = [];
@@ -289,6 +306,8 @@
                             });
                             updateProgress();
                             if (samples.length >= MIN_SAMPLES) finishCollection();
+                        } else {
+                            updateProgress();
                         }
                     },
                     err => {
@@ -471,26 +490,16 @@
             }
             Object.entries(stats).forEach(([num, s]) => {
                 const per = (s.weeks.length / MAX_WEEKS * 100).toFixed(1);
-                csv += `"${num}","${s.name}","${s.weeks.length}/${MAX_WEEKS}","${per}%","${per >= PASS_PERCENT ? 'Geçti' : 'Kaldı'}","${s.weeks.join('-')}"\n`;
+                const status = per >= PASS_PERCENT ? 'Geçti' : 'Kaldı';
+                const weeks = Array.from({length: MAX_WEEKS}, (_, i) => s.weeks.includes(i+1) ? (i+1) : '').filter(Boolean).join('/');
+                csv += `${num},${s.name},${s.weeks.length}/${MAX_WEEKS},${per}%,${status},${weeks}\n`;
             });
-            const blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8;'});
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `devam_${new Date().toISOString().split('T')[0]}.csv`;
+            link.setAttribute('download', 'yoklama.csv');
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
         }
-
-        window.onload = () => {
-            loadData();
-            const params = new URLSearchParams(location.search);
-            if (params.has('week')) {
-                show('studentLogin');
-                document.getElementById('sWeek').textContent = params.get('week');
-            } else {
-                show('teacherLogin');
-            }
-        };
-    </script>
-</body>
-</html>
-            
